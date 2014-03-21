@@ -98,9 +98,10 @@ def load_model(dir):
   model_gamma1 = fitsfile[0].data
   fitsfile.close()
 
-  # set magnetic field to zero for now
-  model_Br[:,:] = 0.0
-  model_Bz[:,:] = 0.0
+  # if desired, set magnetic field to zero
+  if set_magnetic_field_to_zero:
+    model_Br[:,:] = 0.0
+    model_Bz[:,:] = 0.0
 
 
   g = 2.74e4
@@ -115,10 +116,12 @@ def load_model(dir):
   model_omegac_square = np.sqrt(model_cs_square) / (2*model_H)
   model_N_square = g/model_H - g**2 / model_cs_square
 
-  # set N_square to zero for now
-  model_N_square[:,:] = 0.0
-  # set omegac_square to zero for now
-  model_omegac_square[:,:] = 0.0
+  # if desired, set N_square to zero
+  if set_N_square_to_zero:
+    model_N_square[:,:] = 0.0
+  # if desired, set omegac_square to zero
+  if set_omegac_square_to_zero:
+    model_omegac_square[:,:] = 0.0
 
   model_dcssquaredr = np.zeros([len(model_z),len(model_r)])
   for z_index in range(0,len(model_z)):
@@ -149,8 +152,7 @@ def load_model(dir):
      model_dvasquaredz[:,r_index] = np.gradient(model_va_square[:,r_index],model_z[1]-model_z[0])
 
 
-
-  return model_r,model_z,model_vr,model_vz,model_Br,model_Bz,model_cs_square,model_va_r,model_va_z,model_omegac_square,model_N_square,model_dcssquaredr,model_dcssquaredz,model_dvasquaredr,model_dvasquaredz,model_dNsquaredr,model_dNsquaredz,model_domegacsquaredr,model_domegacsquaredz
+  return model_r,model_z,model_vr,model_vz,model_Br,model_Bz,model_cs_square,model_va_r,model_va_z,model_omegac_square,model_N_square,model_dcssquaredr,model_dcssquaredz,model_dvasquaredr,model_dvasquaredz,model_dNsquaredr,model_dNsquaredz,model_domegacsquaredr,model_domegacsquaredz,model_tau
 
 #########################################
 def func(Phi,s,omega):
@@ -171,25 +173,25 @@ def func(Phi,s,omega):
 
   # func[0] = d F / d ki
   dFdki = (
-            - omega**2*(cs_square+va_square)*2*k
-            + cs_square * ( 3*va*k*k + va*(k_square - k*k) + 2*k*(np.dot(va,k)-va*k) )
-            + omegac_square*cs_square*2*np.dot(delz,k)
+            - omega**2 * ( cs_square + va_square ) * 2 * k
+            + cs_square * ( 2 * k * np.dot(va,k)**2 + 2 * k_square * np.dot(va,k) * va )
+            + omegac_square * cs_square * 2 * np.dot(delz,k)
             + cs_square * N_square * 2 * np.dot(delxy,k)
           )
 
   # -func[1] = d F / d xi
   dFdxi = (
-            - omega**2 * k_square * (dcssquaredxi + dvasquaredxi)
-            + k_square * ( np.dot(k,va) * dcssquaredxi + cs_square * np.dot(dvajdxi,k) )
-            - (omega**2*domegacsquaredxi -k[2]**2*(omegac_square*dcssquaredxi+cs_square*domegacsquaredxi) )
-            + (k[0]**2+k[1]**2)*( N_square*dcssquaredxi + cs_square*dNsquaredxi ) 
+            - omega**2 * k_square * ( dcssquaredxi + dvasquaredxi )
+            + k_square * ( np.dot(k,va)**2 * dcssquaredxi + 2 * cs_square * np.dot(va,k) * np.dot(dvajdxi,k) )
+            - ( omega**2 * domegacsquaredxi - k[2]**2 * ( omegac_square * dcssquaredxi + cs_square * domegacsquaredxi ) )
+            + ( k[0]**2 + k[1]**2 ) * ( N_square * dcssquaredxi + cs_square * dNsquaredxi ) 
           )
 
   # -func[2] = d F / d omega
   dFdomega = ( 
-               + 4*omega**3
-               - 2*omega*(cs_square + va_square)*k_square 
-               - omegac_square * 2 * omega
+               + 4 * omega**3
+               - 2 * omega * ( cs_square + va_square ) * k_square 
+               - 2 * omegac_square * omega
              )
 
   # return result
@@ -274,66 +276,176 @@ def get_model(r):
   return B,cs_square,va,va_square,N_square,omegac_square,dcssquaredxi,dvajdxi,dvasquaredxi,dNsquaredxi,domegacsquaredxi 
 
 #########################################
+def get_tau(r):
+
+  x_value = r[0]
+  y_value = r[1]
+  z_value = r[2]
+
+  # compute radius and angle
+  r_value = np.sqrt(x_value**2 + y_value**2)
+  if r_value > 0:
+     cosalpha = x_value / r_value
+     sinalpha = y_value / r_value
+  else:
+     cosalpha = 1.0
+     sinalpha = 0.0
+
+  # find nearest r and z in dataset
+  best_dr = 1e99
+  nearest_r_index = -1
+  for r_index in range(0,len(model_r)):
+     dr = abs(r_value - model_r[r_index])
+     if dr < best_dr:
+        best_dr = dr
+        nearest_r_index = r_index
+  best_dz = 1e99
+  nearest_z_index = -1
+  for z_index in range(0,len(model_z)):
+     dz = abs(z_value - model_z[z_index])
+     if dz < best_dz:
+        best_dz = dz
+        nearest_z_index = z_index
+
+  tau = model_tau[nearest_z_index,nearest_r_index]
+
+  return tau
+
+#########################################
+
+
+set_magnetic_field_to_zero = False
+set_N_square_to_zero = True
+set_omegac_square_to_zero = True
 
 # load model
 print 'Loading model in cylindrical coordinates ... '
-model_r,model_z,model_vr,model_vz,model_Br,model_Bz,model_cs_square,model_va_r,model_va_z,model_omegac_square,model_N_square,model_dcssquaredr,model_dcssquaredz,model_dvasquaredr,model_dvasquaredz,model_dNsquaredr,model_dNsquaredz,model_domegacsquaredr,model_domegacsquaredz = load_model('Rempel_sunspot_data')
+model_r,model_z,model_vr,model_vz,model_Br,model_Bz,model_cs_square,model_va_r,model_va_z,model_omegac_square,model_N_square,model_dcssquaredr,model_dcssquaredz,model_dvasquaredr,model_dvasquaredz,model_dNsquaredr,model_dNsquaredz,model_domegacsquaredr,model_domegacsquaredz,model_tau = load_model('Rempel_sunspot_data')
 
+if set_magnetic_field_to_zero:
+   print 'Magnetic field is OFF'
+else:
+   print 'Magnetic field is ON'
+if set_N_square_to_zero:
+   print 'N**2 is OFF'
+else:
+   print 'N**2 is ON'
+if set_omegac_square_to_zero:
+   print 'omega_c is OFF'
+else:
+   print 'omega_c is ON'
 
 # domain size
 print 'Domain size is from ',-np.max(model_r/1e8),' to ',np.max(model_r/1e8),' Mm by ',np.min(model_z/1e8),' to ',np.max(model_z/1e8),' Mm'
 print 'Sound speed is in the range of ',np.sqrt(np.min(model_cs_square))/1e5,' to ',np.sqrt(np.max(model_cs_square))/1e5,' km/sec'
 
+set_to_reach_tau_001 = True       # stop computing when ray reaches tau=0.01
+mintime = 15.0                    # minimum travel time to compute
+maxtime = 60.0                    # maximum travel time to compute
 
-# set intial values
-#nu = 3e-3
+n_S = 1000
 omega = 3e-3
-r0 = np.array([   5.0,   0.0,   -3.0 ])*1e8
-k0_direction = np.array([  2.0,   0.0,  -1.0])
-
-k0_norm = k0_direction / np.dot(k0_direction,k0_direction)
-B,cs_square,va,va_square,N_square,omegac_square,dcssquaredxi,dvajdxi,dvasquaredxi,dNsquaredxi,domegacsquaredxi = get_model(r0)
-power0 = omega**4 - omegac_square*omega**2
-power2 = -omega**2*(cs_square+va_square) + omegac_square*cs_square*k0_norm[2]**2 + cs_square*N_square*(k0_norm[0]**2+k0_norm[1]**2)
-power4 = cs_square*np.dot(va,k0_norm)**2
-if power4 == 0:
-   k0_mag = np.sqrt( - power0 / power2 )
-else:
-   k0_mag = np.sqrt(max(quadratic(power4,power2,power0)))
-k0 = k0_norm * k0_mag
-print 'Initial wave vector is :',k0
-
-t0 = 0.0
-Phi0 = [ r0[0], r0[1], r0[2], k0[0], k0[1], k0[2], t0 ]
-
-# wave frequency
 additional_argument = (omega,)
 
-# range of s
-min_S = -1e5
-n_S = 100
 
-desired_maxtime = 30.0 # in mins
+# initial locations
+r0s =           [
+                   np.array([   2.0,   0.0,   -2.0 ])*1e8
+                ]
 
-print 'Running solver ... '
-maxt = 0.0
-while maxt < desired_maxtime:
-  s = np.arange(0,min_S,min_S/n_S)
-  Phi = int.odeint(func,Phi0,s,args=additional_argument)
-  maxt = np.max(Phi[:,6])/60.
-  min_S = min_S * desired_maxtime / maxt * 1.05
-print 'Total travel time:'+str(maxt)+' mins'
+# initial directios
+k0_directions = [
+                   np.array([  1.0,   0.0,  1.0])
+                ]
 
+for r0 in r0s:
+ for k0_direction in k0_directions:
 
-#print '>>>>>>>>>>>>>>>>>>>>>>>'
-#for i in range(0,n_S):
-#  print Phi[i,6],Phi[i,0],Phi[i,1],Phi[i,2]
+   print 'Ray from point ',r0/1e8,' [Mm] in direction ',k0_direction,' ... '
+   k0_norm = k0_direction / np.dot(k0_direction,k0_direction)
+   B,cs_square,va,va_square,N_square,omegac_square,dcssquaredxi,dvajdxi,dvasquaredxi,dNsquaredxi,domegacsquaredxi = get_model(r0)
+   power0 = omega**4 - omegac_square * omega**2
+   power2 = - omega**2 * ( cs_square + va_square ) + omegac_square * cs_square * k0_norm[2]**2 + cs_square * N_square * ( k0_norm[0]**2 + k0_norm[1]**2 )
+   power4 = cs_square * np.dot(va,k0_norm)**2
+   if power4 == 0:
+      print '   Determining initial k value: solving linear equation in k**2 with coefficients ',power2,power0,' ... '
+      k0_mags = [np.sqrt( - power0 / power2 )]
+   else:
+      print '   Determining initial k value: solving quadratic equation in k**2 with coefficients ',power4,power2,power0,' ... '
+      k0_mags = np.sqrt(quadratic(power4,power2,power0))
+   print '      Solution(s) for k: ',k0_mags
 
-plt.plot(Phi[:,0]/1e8,Phi[:,2]/1e8)
+   for k0_mag in k0_mags:
+    if k0_mag == min(k0_mags):
+
+      k0 = k0_norm * k0_mag
+      print '   Using initial k: ',k0_mag
+
+      t0 = 0.0
+      Phi0 = [ r0[0], r0[1], r0[2], k0[0], k0[1], k0[2], t0 ]
+
+      # set range of s
+      tmp = func(Phi0,0.0,omega)
+      dtds = tmp[6]
+      min_S = mintime * 60.0 * 1.001 / dtds
+
+      print '      Running solver ... '
+      maxt = -1.0
+      run_complete = False
+      reached = False
+      while not run_complete:
+         s = np.arange(0,min_S,min_S/n_S)
+         Phi = int.odeint(func,Phi0,s,args=additional_argument)
+         maxt = np.max(Phi[:,6])/60.
+         if maxt == 0:
+            run_complete = True
+         else:
+            if maxt >= maxtime:
+               run_complete
+            else:
+               if maxt < mintime:
+                  min_S = min_S * mintime / maxt * 1.001
+               else:
+                  if not set_to_reach_tau_001:
+                     min_S = min_S * maxtime / maxt * 1.001
+                  else:
+                     #check if we have reached tau=0.01
+                     reached = False
+                     reached_at_index = 0
+                     while not reached and reached_at_index < n_S:
+                        if get_tau([Phi[reached_at_index,0],Phi[reached_at_index,1],Phi[reached_at_index,2]]) <= 0.01:
+                           reached = True
+                        else:
+                           reached_at_index += 1
+                     if reached:
+                       run_complete = True
+                     else:
+                        min_S = max(min_S * 2,min_S * maxtime / maxt * 1.001)
+         reached = False
+         reached_at_index = 0
+         while not reached and reached_at_index < n_S:
+            if get_tau([Phi[reached_at_index,0],Phi[reached_at_index,1],Phi[reached_at_index,2]]) <= 0.01:
+               reached = True
+            else:
+               reached_at_index += 1
+         if reached:
+            print '         ... travelled ',maxt,' mins and has reached tau=0.01 at time of '+str(Phi[reached_at_index,6]/60.)
+         else:
+            print '         ... travelled ',maxt,' mins ... '
+
+      if maxt > 0:
+         print '   Plotting ... '
+         if reached:
+            plt.plot(Phi[0:reached_at_index+1,0]/1e8,Phi[0:reached_at_index+1,2]/1e8)
+         else:
+            plt.plot(Phi[:,0]/1e8,Phi[:,2]/1e8)
 plt.xlabel('x [Mm]')
 plt.ylabel('z [Mm]')
 plt.xlim([-np.max(model_r)/1e8,np.max(model_r)/1e8])
 plt.ylim([np.min(model_z)/1e8,np.max(model_z)/1e8])
-plt.show()
 
+plt.xlim([-10.0,+10.0])
+plt.ylim([-10.0,np.max(model_z)/1e8])
+
+plt.show()
 
