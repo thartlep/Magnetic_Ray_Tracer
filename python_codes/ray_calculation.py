@@ -2,17 +2,64 @@ import scipy.integrate as int
 import numpy as np
 import matplotlib.pylab as plt
 
+
+#########################################
+def cbrt(x):
+    from math import pow
+    if x >= 0: 
+	return pow(x, 1.0/3.0)
+    else:
+	return -pow(abs(x), 1.0/3.0)
+
+#########################################
+def polar(x, y, deg=0):		# radian if deg=0; degree if deg=1
+    from math import hypot, atan2, pi
+    if deg:
+	return hypot(x, y), 180.0 * atan2(y, x) / pi
+    else:
+	return hypot(x, y), atan2(y, x)
+
+#########################################
+def quadratic(a, b, c=None):
+    import math, cmath
+    if c:		# (ax^2 + bx + c = 0)
+	a, b = b / float(a), c / float(a)
+    t = a / 2.0
+    r = t**2 - b
+    if r >= 0:		# real roots
+	y1 = math.sqrt(r)
+    else:		# complex roots
+	y1 = cmath.sqrt(r)
+    y2 = -y1
+    return y1 - t, y2 - t
+
+#########################################
+def cubic(a, b, c, d=None):
+    from math import cos
+    if d:			# (ax^3 + bx^2 + cx + d = 0)
+	a, b, c = b / float(a), c / float(a), d / float(a)
+    t = a / 3.0
+    p, q = b - 3 * t**2, c - b * t + 2 * t**3
+    u, v = quadratic(q, -(p/3.0)**3)
+    if type(u) == type(0j):	# complex cubic root
+	r, w = polar(u.real, u.imag)
+	y1 = 2 * cbrt(r) * cos(w / 3.0)
+    else:			# real root
+        y1 = cbrt(u) + cbrt(v)
+    y2, y3 = quadratic(y1, p + y1**2)
+    return y1 - t, y2 - t, y3 - t
+
 #########################################
 def load_model(dir):
 
   from astropy.io import fits as pyfits
 
   fitsfile = pyfits.open(dir+'/r.fits')
-  model_r = fitsfile[0].data
+  model_r = fitsfile[0].data * 1e8
   fitsfile.close()
 
   fitsfile = pyfits.open(dir+'/z.fits')
-  model_z = fitsfile[0].data
+  model_z = fitsfile[0].data * 1e8
   fitsfile.close()
 
   fitsfile = pyfits.open(dir+'/br.fits')
@@ -51,7 +98,59 @@ def load_model(dir):
   model_gamma1 = fitsfile[0].data
   fitsfile.close()
 
-  return model_r,model_z,model_vr,model_vz,model_Br,model_Bz,model_T,model_p,model_rho,model_tau,model_gamma1
+  # set magnetic field to zero for now
+  model_Br[:,:] = 0.0
+  model_Bz[:,:] = 0.0
+
+
+  g = 2.74e4
+  dpdz = np.zeros([len(model_z),len(model_r)])
+  for r_index in range(0,len(model_r)):
+    dpdz[:,r_index] = (np.gradient(model_p[:,r_index],model_z[1]-model_z[0]))
+  model_H = -model_p / dpdz
+  model_cs_square = model_gamma1 * model_p / model_rho
+  model_va_r = model_Br / np.sqrt(4*np.pi*model_rho)
+  model_va_z = model_Bz / np.sqrt(4*np.pi*model_rho)
+  model_va_square = model_va_r**2 + model_va_z**2
+  model_omegac_square = np.sqrt(model_cs_square) / (2*model_H)
+  model_N_square = g/model_H - g**2 / model_cs_square
+
+  # set N_square to zero for now
+  model_N_square[:,:] = 0.0
+  # set omegac_square to zero for now
+  model_omegac_square[:,:] = 0.0
+
+  model_dcssquaredr = np.zeros([len(model_z),len(model_r)])
+  for z_index in range(0,len(model_z)):
+     model_dcssquaredr[z_index,:] = np.gradient(model_cs_square[z_index,:],model_r[1]-model_r[0])
+  model_dcssquaredz = np.zeros([len(model_z),len(model_r)])
+  for r_index in range(0,len(model_r)):
+     model_dcssquaredz[:,r_index] = np.gradient(model_cs_square[:,r_index],model_z[1]-model_z[0])
+
+  model_dNsquaredr = np.zeros([len(model_z),len(model_r)])
+  for z_index in range(0,len(model_z)):
+     model_dNsquaredr[z_index,:] = np.gradient(model_N_square[z_index,:],model_r[1]-model_r[0])
+  model_dNsquaredz = np.zeros([len(model_z),len(model_r)])
+  for r_index in range(0,len(model_r)):
+     model_dNsquaredz[:,r_index] = np.gradient(model_N_square[:,r_index],model_z[1]-model_z[0])
+
+  model_domegacsquaredr = np.zeros([len(model_z),len(model_r)])
+  for z_index in range(0,len(model_z)):
+     model_domegacsquaredr[z_index,:] = np.gradient(model_omegac_square[z_index,:],model_r[1]-model_r[0])
+  model_domegacsquaredz = np.zeros([len(model_z),len(model_r)])
+  for r_index in range(0,len(model_r)):
+     model_domegacsquaredz[:,r_index] = np.gradient(model_omegac_square[:,r_index],model_z[1]-model_z[0])
+
+  model_dvasquaredr = np.zeros([len(model_z),len(model_r)])
+  for z_index in range(0,len(model_z)):
+     model_dvasquaredr[z_index,:] = np.gradient(model_va_square[z_index,:],model_r[1]-model_r[0])
+  model_dvasquaredz = np.zeros([len(model_z),len(model_r)])
+  for r_index in range(0,len(model_r)):
+     model_dvasquaredz[:,r_index] = np.gradient(model_va_square[:,r_index],model_z[1]-model_z[0])
+
+
+
+  return model_r,model_z,model_vr,model_vz,model_Br,model_Bz,model_cs_square,model_va_r,model_va_z,model_omegac_square,model_N_square,model_dcssquaredr,model_dcssquaredz,model_dvasquaredr,model_dvasquaredz,model_dNsquaredr,model_dNsquaredz,model_domegacsquaredr,model_domegacsquaredz
 
 #########################################
 def func(Phi,s,omega):
@@ -63,7 +162,7 @@ def func(Phi,s,omega):
   k_square = k[0]**2 + k[1]**2 + k[2]**2
 
   # get model values
-  B,cs,cs_square,va,va_square,N,N_square,omegac,omegac_square,dcsdxi,dvajdxi,dNdxi,domegacdxi = get_interpolated_model(r)
+  B,cs_square,va,va_square,N_square,omegac_square,dcssquaredxi,dvajdxi,dvasquaredxi,dNsquaredxi,domegacsquaredxi = get_model(r)
 
 
   # stuff
@@ -80,10 +179,10 @@ def func(Phi,s,omega):
 
   # -func[1] = d F / d xi
   dFdxi = (
-            - omega**2 * k_square * (2*cs*dcsdxi + 2*np.dot(dvajdxi,va))
-            + k_square * ( np.dot(k,va) * 2 * cs * dcsdxi + cs_square * np.dot(dvajdxi,k) )
-            - (omega**2*2*omegac*domegacdxi -k[2]**2*(omegac_square*2*cs*dcsdxi+cs_square*2*omegac*domegacdxi) )
-            + (k[0]**2+k[1]**2)*( N_square*2*cs*dcsdxi + cs_square*2*N*dNdxi ) 
+            - omega**2 * k_square * (dcssquaredxi + dvasquaredxi)
+            + k_square * ( np.dot(k,va) * dcssquaredxi + cs_square * np.dot(dvajdxi,k) )
+            - (omega**2*domegacsquaredxi -k[2]**2*(omegac_square*dcssquaredxi+cs_square*domegacsquaredxi) )
+            + (k[0]**2+k[1]**2)*( N_square*dcssquaredxi + cs_square*dNsquaredxi ) 
           )
 
   # -func[2] = d F / d omega
@@ -94,210 +193,147 @@ def func(Phi,s,omega):
              )
 
   # return result
-  print s,'||',dFdki[0],dFdki[1],dFdki[2],'|',-dFdxi[0],-dFdxi[1],-dFdxi[2],'|',-dFdomega
+#  print s,'||',dFdki[0],dFdki[1],dFdki[2],'|',-dFdxi[0],-dFdxi[1],-dFdxi[2],'|',-dFdomega
   return [dFdki[0],dFdki[1],dFdki[2],-dFdxi[0],-dFdxi[1],-dFdxi[2],-dFdomega]
 
 #########################################
-def get_interpolated_model(r):
+def get_model(r):
 
-  x = r[0]
-  y = r[1]
-  z = r[2]
+  x_value = r[0]
+  y_value = r[1]
+  z_value = r[2]
 
-  B = np.array([0.,0.,0.])
-  rho = 1.0
-  H = 1e99
-  cs = 1.0
-  g = 0.0
+  # compute radius and angle
+  r_value = np.sqrt(x_value**2 + y_value**2)
+  if r_value > 0:
+     cosalpha = x_value / r_value
+     sinalpha = y_value / r_value
+  else:
+     cosalpha = 1.0
+     sinalpha = 0.0
 
+  # find nearest r and z in dataset
+  best_dr = 1e99
+  nearest_r_index = -1
+  for r_index in range(0,len(model_r)):
+     dr = abs(r_value - model_r[r_index])
+     if dr < best_dr:
+        best_dr = dr
+        nearest_r_index = r_index 
+  best_dz = 1e99
+  nearest_z_index = -1
+  for z_index in range(0,len(model_z)):
+     dz = abs(z_value - model_z[z_index])
+     if dz < best_dz:
+        best_dz = dz
+        nearest_z_index = z_index 
 
-  cs_square= cs**2
+  Bz = model_Bz[nearest_z_index,nearest_r_index]
+  Br = model_Br[nearest_z_index,nearest_r_index]
+  va_r = model_va_r[nearest_z_index,nearest_r_index]
+  va_z = model_va_z[nearest_z_index,nearest_r_index]
+  cs_square = model_cs_square[nearest_z_index,nearest_r_index]
+  omegac_square = model_omegac_square[nearest_z_index,nearest_r_index]
+  N_square = model_N_square[nearest_z_index,nearest_r_index]
 
-  va = B / np.sqrt(4*np.pi*rho)
+  Bx = Br * cosalpha
+  By = Br * sinalpha
+  B = np.array([Bx,By,Bz])
+
+  va_x = abs(va_r * cosalpha)
+  va_y = abs(va_r * sinalpha)
+  va = np.array([va_x,va_y,va_z])
   va_square = np.dot(va,va)
 
-  omegac_square = cs / ( 2*H )
-  omegac = np.sqrt(omegac_square)
+  dcssquaredr = model_dcssquaredr[nearest_z_index,nearest_r_index]
+  dcssquaredz = model_dcssquaredz[nearest_z_index,nearest_r_index]
+  dcssquaredx = dcssquaredr * cosalpha
+  dcssquaredy = dcssquaredr * sinalpha
+  dcssquaredxi = np.array([dcssquaredx,dcssquaredy,dcssquaredz])
 
-  N_square = g/H - g**2/cs_square
-  N = np.sqrt(N_square)
+  dNsquaredr = model_dNsquaredr[nearest_z_index,nearest_r_index]
+  dNsquaredz = model_dNsquaredz[nearest_z_index,nearest_r_index]
+  dNsquaredx = dNsquaredr * cosalpha
+  dNsquaredy = dNsquaredr * sinalpha
+  dNsquaredxi = np.array([dNsquaredx,dNsquaredy,dNsquaredz])
 
-  dcsdxi = np.zeros(3)
+  domegacsquaredr = model_domegacsquaredr[nearest_z_index,nearest_r_index]
+  domegacsquaredz = model_domegacsquaredz[nearest_z_index,nearest_r_index]
+  domegacsquaredx = domegacsquaredr * cosalpha
+  domegacsquaredy = domegacsquaredr * sinalpha
+  domegacsquaredxi = np.array([domegacsquaredx,domegacsquaredy,domegacsquaredz])
+
+  dvasquaredr = model_dvasquaredr[nearest_z_index,nearest_r_index]
+  dvasquaredz = model_dvasquaredz[nearest_z_index,nearest_r_index]
+  dvasquaredx = dvasquaredr * cosalpha
+  dvasquaredy = dvasquaredr * sinalpha
+  dvasquaredxi = np.array([dvasquaredx,dvasquaredy,dvasquaredz])
+
   dvajdxi = np.zeros([3,3])
-  dNdxi = np.zeros(3)
-  domegacdxi = np.zeros(3)
 
-  return B,cs,cs_square,va,va_square,N,N_square,omegac,omegac_square,dcsdxi,dvajdxi,dNdxi,domegacdxi 
-
-#########################################
-def make_cartesian_model(model_r,model_z,model_vr,model_vz,model_Br,model_Bz,model_T,model_p,model_rho,model_tau,model_gamma1):
-
-  tmp = []
-  for i in range(0,len(model_r)):
-     tmp.append(-model_r[len(model_r)-1-i])
-  for i in range(1,len(model_r)):
-     tmp.append(model_r[i])
-  cartesian_model_x = np.array(tmp)
-  cartesian_model_y = np.array(tmp)
-  cartesian_model_z = model_z
-
-  xlen = len(cartesian_model_x)
-  ylen = len(cartesian_model_y)
-  zlen = len(cartesian_model_z)
-
-  cartesian_model_va_x = np.zeros([xlen,ylen,zlen])
-  cartesian_model_va_y = np.zeros([xlen,ylen,zlen])
-  cartesian_model_va_z = np.zeros([xlen,ylen,zlen])
-  cartesian_model_cs_square = np.zeros([xlen,ylen,zlen])
-  cartesian_model_omegac_square = np.zeros([xlen,ylen,zlen])
-  cartesian_model_N_square = np.zeros([xlen,ylen,zlen])
-  cartesian_model_p = np.zeros([xlen,ylen,zlen])
-
-  print '   Computing va and cs_square ... '
-  max_r = np.max(model_r)
-  from scipy import interpolate
-  for k in range(0,zlen):
-     print '      z='+str(k)+' of '+str(zlen)
-     interpolator_Br = interpolate.interp1d(model_r[:,0],model_Br[k,:],kind='cubic')
-     interpolator_Bz = interpolate.interp1d(model_r[:,0],model_Bz[k,:],kind='cubic')
-     interpolator_rho = interpolate.interp1d(model_r[:,0],model_rho[k,:],kind='cubic')
-     interpolator_p = interpolate.interp1d(model_r[:,0],model_p[k,:],kind='cubic')
-     interpolator_gamma1 = interpolate.interp1d(model_r[:,0],model_gamma1[k,:],kind='cubic')
-     for i in range(0,xlen):
-        for j in range(0,ylen):
-           r_value = np.sqrt(cartesian_model_x[i]**2 + cartesian_model_y[i]**2)
-           if r_value > 0:
-              if cartesian_model_x[i] != 0:
-                 alpha = np.arccos(cartesian_model_x[i]/r_value)
-              else:
-                 alpha = np.arcsin(cartesian_model_y[i]/r_value)
-              if r_value > max_r:
-                 r_value = max_r
-              Br = interpolator_Br(r_value)
-           else:
-              alpha = 0.0
-              Br = 0.0
-           Bz = interpolator_Bz(r_value)
-           Bx = Br*np.cos(alpha)
-           By = Br*np.sin(alpha)
-           rho = interpolator_rho(r_value)
-           p = interpolator_p(r_value)
-           gamma1 = interpolator_gamma1(r_value)
-           factor_va = 1.0/np.sqrt(4*np.pi*rho)
-           va_x = Bx * factor_va
-           va_y = By * factor_va
-           va_z = Bz * factor_va
-           cs_square = gamma1 * p / rho
-           cartesian_model_va_x[i,j,k] = va_x
-           cartesian_model_va_y[i,j,k] = va_y
-           cartesian_model_va_z[i,j,k] = va_z
-           cartesian_model_cs_square[i,j,k] = cs_square
-           cartesian_model_p[i,j,k] = p
-
-  print '   Computing omegac_square and N_square ... '
-  for i in range(0,xlen):
-     for j in range(0,ylen):
-        dpdz = np.gradient(cartesian_model_p[i,j,:],model_z[1]-model_z[0])
-        for k in range(0,zlen):        
-           g = 2.74e2
-           H = -cartesian_model_p[i,j,k] / dpdz[k]
-           cs_square = cartesian_model_cs_square[i,j,k]
-           omegac_square = np.sqrt(cs_square) / (2*H)
-           N_square = g/H - g**2 / cs_square
-           cartesian_model_omegac_square[i,j,k] = omegac_square
-           cartesian_model_N_square[i,j,k] = N_square
-
-  print '   Computing derivatives ... '
-  cartesian_model_domegac_square_dx = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dN_square_dx = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dcs_square_dx = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dva_x_dx = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dva_y_dx = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dva_z_dx = np.zeros([xlen,ylen,zlen])
-  cartesian_model_domegac_square_dy = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dN_square_dy = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dcs_square_dy = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dva_x_dy = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dva_y_dy = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dva_z_dy = np.zeros([xlen,ylen,zlen])
-  cartesian_model_domegac_square_dz = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dN_square_dz = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dcs_square_dz = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dva_x_dz = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dva_y_dz = np.zeros([xlen,ylen,zlen])
-  cartesian_model_dva_z_dz = np.zeros([xlen,ylen,zlen])
-  # compute gradients in x
-  xstep = cartesian_model_x[1]-cartesian_model_x[0]
-  for j in range(0,ylen):
-     for k in range(0,zlen):
-        cartesian_model_domegac_square_dx[:,j,k] = np.gradient(cartesian_model_omegac_square[:,j,k],xstep)
-        cartesian_model_dN_square_dx[:,j,k] = np.gradient(cartesian_model_N_square[:,j,k],xstep)
-        cartesian_model_dcs_square_dx[:,j,k] = np.gradient(cartesian_model_cs_square[:,j,k],xstep)
-        cartesian_model_dva_x_dx[:,j,k] = np.gradient(cartesian_model_va_x[:,j,k],xstep)
-        cartesian_model_dva_y_dx[:,j,k] = np.gradient(cartesian_model_va_y[:,j,k],xstep)
-        cartesian_model_dva_z_dx[:,j,k] = np.gradient(cartesian_model_va_z[:,j,k],xstep)
-  # compute gradients in y
-  ystep = cartesian_model_y[1]-cartesian_model_y[0]
-  for i in range(0,xlen):
-     for k in range(0,zlen):
-        cartesian_model_domegac_square_dy[i,:,k] = np.gradient(cartesian_model_omegac_square[i,:,k],ystep)
-        cartesian_model_dN_square_dy[j,:,k] = np.gradient(cartesian_model_N_square[i,:,k],ystep)
-        cartesian_model_dcs_square_dy[j,:,k] = np.gradient(cartesian_model_cs_square[i,:,k],ystep)
-        cartesian_model_dva_x_dy[j,:,k] = np.gradient(cartesian_model_va_x[i,:,k],ystep)
-        cartesian_model_dva_y_dy[j,:,k] = np.gradient(cartesian_model_va_y[i,:,k],ystep)
-        cartesian_model_dva_z_dy[j,:,k] = np.gradient(cartesian_model_va_z[i,:,k],ystep)
-  # compute gradients in z
-  zstep = cartesian_model_z[1]-cartesian_model_z[0]
-  for i in range(0,xlen):
-     for j in range(0,ylen):
-        cartesian_model_domegac_square_dy[i,j,:] = np.gradient(cartesian_model_omegac_square[i,j,:],ystep)
-        cartesian_model_dN_square_dy[i,j,:] = np.gradient(cartesian_model_N_square[i,j,:],ystep)
-        cartesian_model_dcs_square_dy[i,j,:] = np.gradient(cartesian_model_cs_square[i,j,:],ystep)
-        cartesian_model_dva_x_dz[i,j,:] = np.gradient(cartesian_model_va_x[i,j,:],ystep)
-        cartesian_model_dva_y_dz[i,j,:] = np.gradient(cartesian_model_va_y[i,j,:],ystep)
-        cartesian_model_dva_z_dz[i,j,:] = np.gradient(cartesian_model_va_z[i,j,:],ystep)
-
-  # return results
-  return cartesian_model_x, cartesian_model_y, cartesian_model_z, cartesian_model_cs_square, cartesian_model_va_x, cartesian_model_va_y, cartesian_model_va_z, cartesian_model_omegac_square, cartesian_model_N_square,cartesian_model_domegac_square_dx,cartesian_model_dN_square_dx,cartesian_model_dcs_square_dx,cartesian_model_dva_x_dx,cartesian_model_dva_y_dx,cartesian_model_dva_z_dx,cartesian_model_domegac_square_dy,cartesian_model_dN_square_dy,cartesian_model_dcs_square_dy,cartesian_model_dva_x_dy,cartesian_model_dva_y_dy,cartesian_model_dva_z_dy,cartesian_model_domegac_square_dy,cartesian_model_dN_square_dy,cartesian_model_dcs_square_dy,cartesian_model_dva_x_dz,cartesian_model_dva_y_dz,cartesian_model_dva_z_dz
+  return B,cs_square,va,va_square,N_square,omegac_square,dcssquaredxi,dvajdxi,dvasquaredxi,dNsquaredxi,domegacsquaredxi 
 
 #########################################
 
 # load model
 print 'Loading model in cylindrical coordinates ... '
-model_r,model_z,model_vr,model_vz,model_Br,model_Bz,model_T,model_p,model_rho,model_tau,model_gamma1 = load_model('Rempel_sunspot_data')
-
-print 'Make Cartesian model ... '
-cartesian_model_x, cartesian_model_y, cartesian_model_z, cartesian_model_cs_square, cartesian_model_va_x, cartesian_model_va_y, cartesian_model_va_z, cartesian_model_omegac_square, cartesian_model_N_square,cartesian_model_domegac_square_dx,cartesian_model_dN_square_dx,cartesian_model_dcs_square_dx,cartesian_model_dva_x_dx,cartesian_model_dva_y_dx,cartesian_model_dva_z_dx,cartesian_model_domegac_square_dy,cartesian_model_dN_square_dy,cartesian_model_dcs_square_dy,cartesian_model_dva_x_dy,cartesian_model_dva_y_dy,cartesian_model_dva_z_dy,cartesian_model_domegac_square_dy,cartesian_model_dN_square_dy,cartesian_model_dcs_square_dy,cartesian_model_dva_x_dz,cartesian_model_dva_y_dz,cartesian_model_dva_z_dz = make_cartesian_model(model_r,model_z,model_vr,model_vz,model_Br,model_Bz,model_T,model_p,model_rho,model_tau,model_gamma1)
+model_r,model_z,model_vr,model_vz,model_Br,model_Bz,model_cs_square,model_va_r,model_va_z,model_omegac_square,model_N_square,model_dcssquaredr,model_dcssquaredz,model_dvasquaredr,model_dvasquaredz,model_dNsquaredr,model_dNsquaredz,model_domegacsquaredr,model_domegacsquaredz = load_model('Rempel_sunspot_data')
 
 
-# set parameters
-min_S = -1e7
-n_S = 100
+# domain size
+print 'Domain size is from ',-np.max(model_r/1e8),' to ',np.max(model_r/1e8),' Mm by ',np.min(model_z/1e8),' to ',np.max(model_z/1e8),' Mm'
+print 'Sound speed is in the range of ',np.sqrt(np.min(model_cs_square))/1e5,' to ',np.sqrt(np.max(model_cs_square))/1e5,' km/sec'
 
 
-# set intial value
-r0 = [    0.0,   0.0,  0.0 ] 
-k0 = [   2.2361e-3,   0.0,  -2e-3] 
+# set intial values
+#nu = 3e-3
+omega = 3e-3
+r0 = np.array([   5.0,   0.0,   -3.0 ])*1e8
+k0_direction = np.array([  2.0,   0.0,  -1.0])
+
+k0_norm = k0_direction / np.dot(k0_direction,k0_direction)
+B,cs_square,va,va_square,N_square,omegac_square,dcssquaredxi,dvajdxi,dvasquaredxi,dNsquaredxi,domegacsquaredxi = get_model(r0)
+power0 = omega**4 - omegac_square*omega**2
+power2 = -omega**2*(cs_square+va_square) + omegac_square*cs_square*k0_norm[2]**2 + cs_square*N_square*(k0_norm[0]**2+k0_norm[1]**2)
+power4 = cs_square*np.dot(va,k0_norm)**2
+if power4 == 0:
+   k0_mag = np.sqrt( - power0 / power2 )
+else:
+   k0_mag = np.sqrt(max(quadratic(power4,power2,power0)))
+k0 = k0_norm * k0_mag
+print 'Initial wave vector is :',k0
+
 t0 = 0.0
 Phi0 = [ r0[0], r0[1], r0[2], k0[0], k0[1], k0[2], t0 ]
-omega = 3e-3
 
 # wave frequency
 additional_argument = (omega,)
 
 # range of s
-s = np.arange(0,min_S,min_S/n_S)
+min_S = -1e5
+n_S = 100
 
-# call solver
-Phi = int.odeint(func,Phi0,s,args=additional_argument)
+desired_maxtime = 30.0 # in mins
 
-print '>>>>>>>>>>>>>>>>>>>>>>>'
-for i in range(0,n_S):
-  print Phi[i,6],Phi[i,0],Phi[i,1],Phi[i,2]
+print 'Running solver ... '
+maxt = 0.0
+while maxt < desired_maxtime:
+  s = np.arange(0,min_S,min_S/n_S)
+  Phi = int.odeint(func,Phi0,s,args=additional_argument)
+  maxt = np.max(Phi[:,6])/60.
+  min_S = min_S * desired_maxtime / maxt * 1.05
+print 'Total travel time:'+str(maxt)+' mins'
 
-plt.plot(Phi[:,0],Phi[:,2])
-plt.xlabel('x')
-plt.ylabel('z')
+
+#print '>>>>>>>>>>>>>>>>>>>>>>>'
+#for i in range(0,n_S):
+#  print Phi[i,6],Phi[i,0],Phi[i,1],Phi[i,2]
+
+plt.plot(Phi[:,0]/1e8,Phi[:,2]/1e8)
+plt.xlabel('x [Mm]')
+plt.ylabel('z [Mm]')
+plt.xlim([-np.max(model_r)/1e8,np.max(model_r)/1e8])
+plt.ylim([np.min(model_z)/1e8,np.max(model_z)/1e8])
 plt.show()
 
 
