@@ -73,6 +73,6 @@ for angle_h in angle_h_s:
 results = ray.propagate_rays(dir_simulation_data,set_magnetic_field_to_zero,set_N_square_to_zero,set_omegac_square_to_zero,r0s,k0_directions,omega,set_to_reach_tau_001,mintime,maxtime,n_S,accuracy)
 
 print 'Saving results ... '
-np.savez('../results/'+case_name+'/output.raypaths.'+run_name+'.npz',results)
+np.savez('results/'+case_name+'/output.raypaths.'+run_name+'.npz',results)
 
 print 'Done.'
