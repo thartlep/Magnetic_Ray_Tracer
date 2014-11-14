@@ -371,13 +371,14 @@ def propagate_rays(data_dir,set_magnetic_field_to_zero,set_N_square_to_zero,set_
  output = []
 
  for r0 in r0s:
+  r0 = np.array(r0)
   ray_counter = 0
   for k0_direction in k0_directions:
-
    ray_counter += 1
    print 'Ray from point ',r0/1e8,' [Mm] in direction ',k0_direction,' (',ray_counter,' of ',len(k0_directions),' directions) ... '
    k0_norm = k0_direction / np.dot(k0_direction,k0_direction)
    B,cs_square,va,va_square,N_square,omegac_square,dcssquaredxi,dvajdxi,dvasquaredxi,dNsquaredxi,domegacsquaredxi = get_model(r0)
+   #print 'Model:',B,cs_square,va,va_square,N_square,omegac_square,dcssquaredxi,dvajdxi,dvasquaredxi,dNsquaredxi,domegacsquaredxi
    power0 = omega**4 - omegac_square * omega**2
    power2 = - omega**2 * ( cs_square + va_square ) + omegac_square * cs_square * k0_norm[2]**2 + cs_square * N_square * ( k0_norm[0]**2 + k0_norm[1]**2 )
    power4 = cs_square * np.dot(va,k0_norm)**2
@@ -437,7 +438,7 @@ def propagate_rays(data_dir,set_magnetic_field_to_zero,set_N_square_to_zero,set_
                if not set_to_reach_tau_001:
                   min_S = min_S * maxtime / maxt * 1.001
                else:
-                  min_S = max(min_S * 2,min_S * maxtime / maxt * 1.001)
+                  min_S = max(min_S * 3, 2* min_S * maxtime / maxt * 1.001 )
          if reached:
             print '         ... travelled ',maxt,' mins and has reached tau=0.01 at time of '+str(Phi[reached_at_index,6]/60.)
          else:
