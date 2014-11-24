@@ -22,6 +22,7 @@ def direction(angle_h, angle_xy):
 
 dir_simulation_data = sys.argv[1]
 case_name = sys.argv[2]
+file_index = int(sys.argv[3])
 
 print 'CASE: '+case_name+', DATA: '+dir_simulation_data+'\n'
 
@@ -37,13 +38,12 @@ maxtime = 60.0                    # maximum travel time to compute
 
 accuracy = 1e-3
 
-n_S = 1000
+n_S = 10000
 omega = 3e-3
 additional_argument = (omega,)
 
-depth = 8.0
-offset = 5.0
-file_index = 0
+depth = 5.0
+offset = 7.5
 
 if file_index == 0:
    angle_resolution = 10
@@ -53,6 +53,11 @@ if file_index == 1:
    angle_resolution = 10
    angle_xy_s = 5+range(0,80+angle_resolution,angle_resolution)
    angle_h_s = range(-60,240+angle_resolution,angle_resolution)
+if file_index == 2:
+   angle_xy_s = [0]
+#   angle_h_s = [10,-5,-3,-2,-1.5,-1,-0.5,0.,0.5,1,1.5,2,3,5,10,30,60,90,120,150,170,175,177,178,178.5,179,179.5,180,180.5,181,181.5,182,183,185,190,225,270,315]
+   angle_h_s = [25,15,5,-3.3,-6.7,-13.3,-16.7,-23.3,-26.7,-32.5,-35,-37.5,-42.5,-45.,-85]
+   angle_h_s = angle_h_s + list(180.0 - np.array(angle_h_s))   
 
 # run name
 run_name = 'freq_'+str(omega*1e3)+'_mHz__depth_'+str(depth)+'_Mm__offset_'+str(offset)+'_Mm__run'+str(file_index)
