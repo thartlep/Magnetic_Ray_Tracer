@@ -1,6 +1,5 @@
 import scipy.integrate as int
 import numpy as np
-import matplotlib.pylab as plt
 
 
 #########################################
