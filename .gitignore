@@ -1,3 +1,11 @@
 *.pyc
 *.npz
 *.fits
+*.png
+*.avi
+output*
+*.txt
+*.qs
+*.o*
+*.e*
+
