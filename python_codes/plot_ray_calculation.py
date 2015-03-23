@@ -13,6 +13,18 @@ interpolate_the_wave_fronts = True
 interpolate_the_tau_surface = True
 
 #################################################
+# interpolate
+def my_interpolate(x,y,smoothing_factor):
+
+   from scipy.interpolate import UnivariateSpline
+   spl = UnivariateSpline(x, y)
+   spl.set_smoothing_factor(smoothing_factor)
+   new_x = np.linspace(np.min(x),np.max(x),200)
+   new_y = spl(new_x)
+
+   return new_y
+
+#################################################
 # 'stolen' from the internets @ http://stackoverflow.com/questions/22988882/how-to-smooth-a-curve-in-python
 #
 def savitzky_golay(y, window_size, order, deriv=0, rate=1):
@@ -253,7 +265,7 @@ if plot_which == 1 or plot_which == 4 or plot_which == 5:
  time_step = 2.0              # mins
 
  frequency = 3e-3
- packet_half_time_in_min = 9.0
+ packet_half_time_in_min = 20.0
 
  min_time = -packet_half_time_in_min
  max_time = time_step + 20.0 + packet_half_time_in_min * 2
@@ -275,12 +287,12 @@ if plot_which == 1 or plot_which == 4 or plot_which == 5:
        if file_counter < first_image or file_counter > last_image:
           skip_computation = True
        if file_counter < 10:
-          filename = '00'+str(file_counter)+'.png'
+          filename = '00'+str(file_counter)+'.eps'
        else:
           if file_counter < 100:
-             filename = '0'+str(file_counter)+'.png'
+             filename = '0'+str(file_counter)+'.eps'
           else:
-             filename = str(file_counter)+'.png'
+             filename = str(file_counter)+'.eps'
        existing_files = glob.glob(filename)
        if len(existing_files) != 0:
           skip_computation = True
@@ -296,7 +308,7 @@ if plot_which == 1 or plot_which == 4 or plot_which == 5:
      if plot_which == 5:
         fig,ax = plot_raypaths(False,False,True,False)
         time_string = "{:5.2f}".format(mean_time_index*mean_time_step)
-        plt.text(15.5,0.5,'Time = '+time_string+' min')
+#        plt.text(15.5,0.5,'Time = '+time_string+' min')
 
      for case in [0,1]:
 
@@ -305,13 +317,13 @@ if plot_which == 1 or plot_which == 4 or plot_which == 5:
          time_step = 0.25
       elif case == 1:
          line_thickness = 3
-         time_step = 0.10
+         time_step = 0.05
 
 
       print 'Running with line_thickness of ',line_thickness,' and a time_step of ',time_step,' ... '
 
       wave_packet_times_in_sec = np.arange(-packet_half_time_in_min*60,+packet_half_time_in_min*60,time_step*60)
-      gabor_wavelet = np.cos(2*np.pi*frequency*wave_packet_times_in_sec)*np.exp(-np.pi*wave_packet_times_in_sec**2*5e-6)
+      gabor_wavelet = np.cos(2*np.pi*frequency*wave_packet_times_in_sec)*np.exp(-wave_packet_times_in_sec**2/(2*300.**2))
       gabor_wavelet = gabor_wavelet / np.max(np.abs(gabor_wavelet))
 
       for wavelet_index in range(0,len(gabor_wavelet)):
@@ -394,28 +406,37 @@ if plot_which == 1 or plot_which == 4 or plot_which == 5:
               # remove possible NANs
               xvals = []
               zvals = []
+              anglevals = []
               tmp_xvals = []
               tmp_zvals = []
+              tmp_anglevals = []
+
               for i in range(0,len(x_vals)):
                  if x_vals[i] != x_vals[i] or z_vals[i] != z_vals[i]:
                     if len(tmp_zvals) > 0:
                        xvals.append(np.array(tmp_xvals))
                        zvals.append(np.array(tmp_zvals))
+                       anglevals.append(np.array(tmp_anglevals))
                        tmp_xvals = []
                        tmp_zvals = []
+                       tmp_anglevals = []
                  else:
                     tmp_xvals.append(x_vals[i])
                     tmp_zvals.append(z_vals[i])
+                    tmp_anglevals.append(angle_h_vals[i])
               if len(tmp_zvals) > 0:
                  xvals.append(np.array(tmp_xvals))
                  zvals.append(np.array(tmp_zvals))
+                 anglevals.append(np.array(tmp_anglevals))
 
               # now plot (interpolated or not)
               print 'Number of segments: ',len(xvals)
               for i in range(0,len(xvals)):
-                if len(xvals[i]) > 5: 
-                  plot_xvals = savitzky_golay(xvals[i], 17, 2)
-                  plot_zvals = savitzky_golay(zvals[i], 17, 2)
+                if len(xvals[i]) > 10: 
+                  plot_xvals = my_interpolate(anglevals[i],xvals[i],2)
+#                  plot_xvals = savitzky_golay(xvals[i], 17, 2)
+                  plot_zvals = my_interpolate(anglevals[i],zvals[i],2)
+#                  plot_zvals = savitzky_golay(zvals[i], 17, 2)
                   plot_xvals = list(plot_xvals)
                   plot_zvals = list(plot_zvals)
                   if 1 == 0 and (plot_xvals[len(plot_xvals)-1] > 10 or plot_xvals[len(plot_xvals)-1] < 5) and plot_zvals[len(plot_zvals)-1] > -1:
