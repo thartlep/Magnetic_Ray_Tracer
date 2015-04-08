@@ -16,11 +16,15 @@ interpolate_the_tau_surface = True
 # interpolate
 def my_interpolate(x,y,smoothing_factor):
 
-   from scipy.interpolate import UnivariateSpline
-   spl = UnivariateSpline(x, y)
-   spl.set_smoothing_factor(smoothing_factor)
-   new_x = np.linspace(np.min(x),np.max(x),200)
-   new_y = spl(new_x)
+   k = 3
+   if len(x) > k:
+     from scipy.interpolate import UnivariateSpline
+     spl = UnivariateSpline(x, y, k=k)
+     spl.set_smoothing_factor(smoothing_factor)
+     new_x = np.linspace(np.min(x),np.max(x),200)
+     new_y = spl(new_x)
+   else:
+     new_y = y
 
    return new_y
 
@@ -299,6 +303,9 @@ if plot_which == 1 or plot_which == 4 or plot_which == 5:
 
     file_counter += 1
   
+    if mean_time_index*mean_time_step != 7.5:
+      skip_computation = True
+
     if skip_computation:
 
      print ' ... skipping ',filename,' ... '
@@ -308,13 +315,13 @@ if plot_which == 1 or plot_which == 4 or plot_which == 5:
      if plot_which == 5:
         fig,ax = plot_raypaths(False,False,True,False)
         time_string = "{:5.2f}".format(mean_time_index*mean_time_step)
-#        plt.text(15.5,0.5,'Time = '+time_string+' min')
+        plt.text(15.5,0.5,'Time = '+time_string+' min')
 
-     for case in [0,1]:
+     for case in [0]: #,1]:
 
       if case == 0:
          line_thickness = 15
-         time_step = 0.25
+         time_step = 1.0 #0.25
       elif case == 1:
          line_thickness = 3
          time_step = 0.05
@@ -433,9 +440,49 @@ if plot_which == 1 or plot_which == 4 or plot_which == 5:
               print 'Number of segments: ',len(xvals)
               for i in range(0,len(xvals)):
                 if len(xvals[i]) > 10: 
-                  plot_xvals = my_interpolate(anglevals[i],xvals[i],2)
+
+
+                  new_xvals = []
+                  new_zvals = []
+                  new_anglevals = []
+                  current_xval = 0
+                  current_zval = 0
+                  current_anglevals = 0
+                  current_counter = 0
+                  new_val = True
+                  for j in range(0,len(anglevals[i])):
+#                     print anglevals[i][j],new_anglevals
+                     if not new_val:
+                        if abs(anglevals[i][j] - (current_angleval/current_counter)) < 2.0:
+#                           print 'Less ',current_angleval/current_counter
+                           current_xval += xvals[i][j]
+                           current_zval += zvals[i][j]
+                           current_angleval += anglevals[i][j]
+                           current_counter += 1
+                        else:
+#                           print 'Greater'
+                           new_xvals.append(current_xval / current_counter)
+                           new_zvals.append(current_zval / current_counter)
+                           new_anglevals.append(current_angleval / current_counter)
+                           current_xval = 0
+                           current_zval = 0
+                           current_anglevals = 0
+                           current_counter = 0
+                           new_val = True
+                     if new_val:
+#                        print 'New'
+                        current_xval = xvals[i][j]
+                        current_zval = zvals[i][j]
+                        current_angleval = anglevals[i][j]
+                        current_counter = 1
+                        new_val = False
+
+#                  print new_anglevals
+                  plot_xvals = my_interpolate(new_anglevals,new_xvals,1)
+#                  plot_xvals = my_interpolate(anglevals[i],xvals[i],2)
 #                  plot_xvals = savitzky_golay(xvals[i], 17, 2)
-                  plot_zvals = my_interpolate(anglevals[i],zvals[i],2)
+                  plot_zvals = my_interpolate(new_anglevals,new_zvals,1)
+#                  plot_zvals = my_interpolate(anglevals[i],zvals[i],2)
 #                  plot_zvals = savitzky_golay(zvals[i], 17, 2)
                   plot_xvals = list(plot_xvals)
                   plot_zvals = list(plot_zvals)
