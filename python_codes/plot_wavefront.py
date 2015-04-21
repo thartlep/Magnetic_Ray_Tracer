@@ -12,6 +12,12 @@ import glob
 interpolate_the_wave_fronts = True
 interpolate_the_tau_surface = True
 
+### SET FIGURE SIZE ###############
+from pylab import rcParams
+rcParams['figure.figsize'] = 8, 4     # 8,6
+### END - SET FIGURE SIZE #########
+
+
 #################################################
 # interpolate
 def my_interpolate(x,y,smoothing_factor):
@@ -354,8 +360,8 @@ for file_name in file_names:
 first_call = True
 outlier_distance = 1.0
 smoothing_parameter = 10.0 #0.1 #0.1
-filetype = '.png' # '.eps'
-plot_only_specific_time = -1.0   #7.5 set to negative to plot all times
+filetype = '.eps' #'.png' # '.eps'
+plot_only_specific_time = 7.5     # set to negative to plot all times
 
 ##################################################
 if 1 == 1:
@@ -416,7 +422,7 @@ if 1 == 1:
      fig,ax = plot_raypaths(False,False,True,False)
 
      time_string = "{:5.2f}".format(mean_time_index*mean_time_step)
-     plt.text(13,0.5,'Time = '+time_string+' min')
+     plt.text(-5.5,0.25,'Time = '+time_string+' min')
 
 
      for case in [1]:
@@ -450,7 +456,7 @@ if 1 == 1:
             red = 1.0 - abs(amplitude)
             blue = 1.0
          color = [red, green, blue]
-         plt.plot([0,20],[-3,-3],'-',color=color,linewidth=400)
+         plt.plot([-20,0],[-3,-3],'-',color=color,linewidth=400)
 #         print color
 
       for wavelet_index in range(0,len(gabor_wavelet)):
@@ -660,10 +666,10 @@ if 1 == 1:
      plot_raypaths(False,False,True,True,fig,ax)
      plt.xlabel('x [Mm]')
      plt.ylabel('z [Mm]')
-     plt.xlim([0.0,+20.0])
+     plt.xlim([-20.0,0.0])
      plt.ylim([-6.0,+1.0])
 
-     plt.savefig(filename)
+     plt.savefig(filename,bbox_inches='tight')
 
 
 

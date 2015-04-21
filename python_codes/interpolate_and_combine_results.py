@@ -62,6 +62,8 @@ def interpolate_raypath(Phi,tau,time_step,absolute_max_time):
 interpolate_time_step = 60.0 * 0.05
 absolute_max_time = 60.0 * 30.0
 
+flip_sign = True
+
 #
 files = []
 for i in range(1,len(sys.argv)):
@@ -79,7 +81,10 @@ for fileindex in range(0,number_of_files):
   for i in range(0,tmp.shape[0]):
     r0 = tmp[i,0]
     k0 = tmp[i,1]
-    Phi = tmp[i,2]
+    if not flip_sign:
+       Phi = tmp[i,2]
+    else:
+       Phi = tmp[i,2]*[-1,-1,1,-1,-1,1,1]
     reached = tmp[i,3]
     reached_at_index = tmp[i,4]
     tau = np.array(tmp[i,5])
