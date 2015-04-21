@@ -1,5 +1,6 @@
 *.pyc
 *.npz
+*.npz*
 *.fits
 *.png
 *.avi
@@ -8,4 +9,8 @@ output*
 *.qs
 *.o*
 *.e*
-
+*.pdf
+*.avi
+*.sav
+*.gif
+*.xcf
