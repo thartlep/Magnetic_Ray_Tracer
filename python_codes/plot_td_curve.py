@@ -61,7 +61,7 @@ plt.xlim([0,35])
 plt.ylim([0,25])
 #plt.xlim([0,40])
 #plt.ylim([0,30])
-plt.plot([0,40],[0,40/45.3*1000./60.],':',color='white')
+plt.plot([0,40],[0,40/45.3*1000./60.],'--',color='white',linewidth=2.0)
 plt.savefig('td.eps',bbox_inches='tight')
 #plt.show()
 
